@@ -1,0 +1,189 @@
+grammar Lua
+{
+    options
+    {
+        Axiom = "ROOT";
+        Separator = "SEPARATOR";
+        ParserType = "RNGLR";
+    }
+
+    terminals
+    {
+        NEW_LINE        -> U+000D /* CR */
+                        |  U+000A /* LF */
+                        |  U+000D U+000A /* CR LF */
+                        |  U+0085 // Next line character
+                        |  U+2028 // Line separator character
+                        |  U+2029 ; //Paragraph separator character (U+2029)
+
+        WHITE_SPACE -> U+0020 | U+0009 | U+000B | U+000C | U+000d | U+000a;
+
+        INTEGER -> [0-9] [0-9]*;
+
+        REAL -> ('0' | [1-9] [0-9]*)? '.' ('0' | [1-9] [0-9]*) ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*))?
+                        |  ('0' | [1-9] [0-9]*) ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*)) ?
+                        |  ('0' | [1-9] [0-9]*);
+
+        STRINGDQ -> '"' ( (. - ('"' | '\\')) |
+                               ('\\' ('"' | '\\'))
+                        )*  '"';
+
+        STRINGSQ -> '\'' ( (. - ('\'' | '\\')) |
+                               ('\\' ('\'' | '\\'))
+                        )*  '\'';
+
+        COMMENT_LINE    -> '--' (.* - (.* NEW_LINE .*)) ;
+        IDENTIFIER  -> [a-zA-Z_] [a-zA-Z0-9_]* ;
+        SEPARATOR   -> WHITE_SPACE | COMMENT_LINE | NEW_LINE;
+    }
+
+    rules {
+        NIL -> 'nil';
+
+        BOOLEAN_TRUE -> 'true';
+
+        BOOLEAN_FALSE -> 'false';
+
+        BOOLEAN -> BOOLEAN_TRUE | BOOLEAN_FALSE;
+
+        STRING -> STRINGDQ | STRINGSQ;
+
+        NUMBER -> INTEGER | REAL;
+
+        CONSTANT -> NIL |
+                    BOOLEAN |
+                    STRING |
+                    NUMBER;
+
+
+        VARIABLE -> IDENTIFIER;
+
+        PROPERTY -> CALLABLE_EXPR '.'^ IDENTIFIER;
+
+        ARRAY_ELEMENT -> CALLABLE_EXPR^ '['! EXPR ']'!;
+
+        ASSIGN_TARGET -> VARIABLE | PROPERTY | ARRAY_ELEMENT;
+
+        ASSIGN_TARGET_LIST -> ASSIGN_TARGET (',' ASSIGN_TARGET_LIST) *;
+
+        CALL_ARGS -> REXPR (','! REXPR)*;
+
+        CALL -> CALLABLE_EXPR^ '('! CALL_ARGS? ')'!;
+
+        ARRAY_DECLARATION_ELEMENT -> EXPR |
+                                     IDENTIFIER '='^ REXPR;
+
+        ARRAY_DECLARATION_ELEMENTS -> ARRAY_DECLARATION_ELEMENT (',' ARRAY_DECLARATION_ELEMENT)*;
+
+        ARRAY_DECLARATION -> '{'! { ARRAY_DECLARATION_ELEMENTS? } '}'!;
+
+        METHOD -> CALLABLE_EXPR ':'^ IDENTIFIER;
+
+        LAMBDA_DECLARATION -> 'function' {'('!  ID_LIST? ')'!} { STATEMENTS } 'end'!;
+
+        CALLABLE_EXPR -> ASSIGN_TARGET |
+                         METHOD |
+                         CALL;
+
+        BRACKET_EXPR -> '('! EXPR ')'!;
+
+        SIMPLE_EXPR -> CONSTANT |
+                       CALLABLE_EXPR |
+                       BRACKET_EXPR;
+
+        UNARY_EXPR -> SIMPLE_EXPR |
+                      '-'^ SIMPLE_EXPR |
+                      '+'^ SIMPLE_EXPR;
+
+        POWER_EXPR -> UNARY_EXPR |
+                      POWER_EXPR '^'^ UNARY_EXPR;
+
+        MUL_EXPR -> POWER_EXPR |
+                    MUL_EXPR '*'^ POWER_EXPR |
+                    MUL_EXPR '/'^ POWER_EXPR;
+
+        ADD_EXPR -> MUL_EXPR |
+                    ADD_EXPR '..'^ MUL_EXPR |
+                    ADD_EXPR '+'^ MUL_EXPR |
+                    ADD_EXPR '-'^ MUL_EXPR;
+
+        REL_EXPR -> ADD_EXPR |
+                    REL_EXPR '=='^ ADD_EXPR |
+                    REL_EXPR '~='^ ADD_EXPR |
+                    REL_EXPR '>'^ ADD_EXPR |
+                    REL_EXPR '>='^ ADD_EXPR |
+                    REL_EXPR '<'^ ADD_EXPR |
+                    REL_EXPR '<='^ ADD_EXPR;
+
+        UX_BOOL_EXPR -> REL_EXPR |
+                        'not'^ REL_EXPR;
+
+        AND_BOOL_EXPR -> UX_BOOL_EXPR |
+                         AND_BOOL_EXPR 'and'^ UX_BOOL_EXPR;
+
+        OR_BOOL_EXPR -> AND_BOOL_EXPR |
+                        OR_BOOL_EXPR 'or'^ AND_BOOL_EXPR;
+
+        EXPR -> OR_BOOL_EXPR;
+
+        EOS -> ';' *;
+
+        REXPR -> EXPR | ARRAY_DECLARATION | LAMBDA_DECLARATION;
+
+        ASSIGN_STMT -> ASSIGN_TARGET_LIST '='^ CALL_ARGS EOS!;
+
+        CALL_STMT -> CALL EOS!;
+
+        DECLARATION_ITEM -> IDENTIFIER |
+                            ID_LIST '='^ CALL_ARGS; 
+
+        DECLARATION_ITEMS -> DECLARATION_ITEM (','! DECLARATION_ITEM)*;
+
+        DECLARATION -> 'local' { DECLARATION_ITEMS } EOS!;
+
+        RETURN_STMT ->  'return' {CALL_ARGS?} EOS!;
+
+        ELSEIF_CLAUSE -> 'elseif'^ { EXPR } 'then'! { STATEMENTS };
+
+        ELSE_CLAUSE -> 'else'^ { STATEMENTS };
+
+        IF_STMT -> 'if'^ { EXPR } { 'then'^ { STATEMENTS } }
+                    ELSEIF_CLAUSE*
+                    ELSE_CLAUSE?
+                    'end'! EOS!;
+
+        WHILE_STMT -> 'while'^ {EXPR} {'do'! STATEMENTS 'end'!};
+
+        REPEAT_STMT -> 'repeat'^ { STATEMENTS } {'until'^ EXPR };
+
+        FOR_STMT -> 'for'^ { IDENTIFIER '='! EXPR ','! EXPR (','! EXPR)? } {'do'! STATEMENTS 'end'!};
+
+        FOR_IN_STMT -> 'for'^ { IDENTIFIER 'in'! EXPR } {'do'! STATEMENTS 'end'!};
+
+        BREAK_STMT -> 'break' EOS!;
+
+        STATEMENT -> DECLARATION |
+                     ASSIGN_STMT |
+                     CALL_STMT |
+                     IF_STMT |
+                     WHILE_STMT |
+                     REPEAT_STMT |
+                     FOR_STMT |
+                     FOR_IN_STMT |
+                     BREAK_STMT |
+                     RETURN_STMT |
+                     FUNCTION_DECLARATION;
+
+        STATEMENTS -> STATEMENT STATEMENT*;
+
+        ID_LIST -> IDENTIFIER (','! IDENTIFIER)*;
+
+        FUNCTION_DECLARATION -> 'function' IDENTIFIER^ '('!  ID_LIST? ')'! { STATEMENTS? } 'end'!;
+
+        BODY_ITEM -> STATEMENT;
+
+        BODY_ITEMS -> BODY_ITEM BODY_ITEM*;
+
+        ROOT -> BODY_ITEMS;
+    }
+}
