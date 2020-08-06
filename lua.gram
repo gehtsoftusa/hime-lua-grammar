@@ -68,14 +68,18 @@ grammar Lua
 
         ASSIGN_TARGET -> VARIABLE | PROPERTY | ARRAY_ELEMENT;
 
-        ASSIGN_TARGET_LIST -> ASSIGN_TARGET (',' ASSIGN_TARGET_LIST) *;
+        ASSIGN_TARGET_LIST -> ASSIGN_TARGET (','! ASSIGN_TARGET) *;
 
         CALL_ARGS -> REXPR (','! REXPR)*;
 
-        CALL -> CALLABLE_EXPR '('! CALL_ARGS? ')'!;
+        CALL_BRACKET -> '('! CALL_ARGS? ')'!;
+
+        CALL -> CALLABLE_EXPR CALL_BRACKET;
+
+        FIELD_ASSIGNMENT -> IDENTIFIER '='! REXPR;
 
         ARRAY_DECLARATION_ELEMENT -> EXPR |
-                                     IDENTIFIER '='^ REXPR;
+                                     FIELD_ASSIGNMENT;
 
         ARRAY_DECLARATION_ELEMENTS -> ARRAY_DECLARATION_ELEMENT (','! ARRAY_DECLARATION_ELEMENT)*;
 
@@ -170,12 +174,7 @@ grammar Lua
 
         DECLARATION_ITEM_ASSIGNMENT -> ID_LIST '='! CALL_ARGS;
 
-        DECLARATION_ITEM -> IDENTIFIER |
-                            DECLARATION_ITEM_ASSIGNMENT; 
-
-        DECLARATION_ITEMS -> DECLARATION_ITEM (','! DECLARATION_ITEM)*;
-
-        DECLARATION -> 'local'! DECLARATION_ITEMS  EOS!;
+        DECLARATION -> 'local'! ID_LIST ('='! CALL_ARGS)?  EOS!;
 
         RETURN_STMT ->  'return'! CALL_ARGS? EOS!;
 
