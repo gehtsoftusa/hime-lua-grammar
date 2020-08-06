@@ -20,16 +20,20 @@ grammar Lua
 
         INTEGER -> [0-9] [0-9]*;
 
-        REAL -> ('0' | [1-9] [0-9]*)? '.' ('0' | [1-9] [0-9]*) ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*))?
-                        |  ('0' | [1-9] [0-9]*) ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*)) ?
-                        |  ('0' | [1-9] [0-9]*);
+        REAL -> ('0' | [1-9] [0-9]*)? '.' [0-9]* ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*))?
+                        |  ([0-9] [0-9]*) ([eE] ('+'|'-')? ('0' | [1-9] [0-9]*)) ?
+                        |  ([0-9] [0-9]*);
 
         STRINGDQ -> '"' ( (. - ('"' | '\\')) |
-                               ('\\' ('"' | '\\'))
+                               ('\\' ('"' | '\\' | 'r' | 'n' | 'b' | 't')) | 
+                               ('\\' [0-9] [0-9] [0-9]) |
+                               ('\\' 'x' [0-9a-fA-F] [0-9a-fA-F])
                         )*  '"';
 
         STRINGSQ -> '\'' ( (. - ('\'' | '\\')) |
-                               ('\\' ('\'' | '\\'))
+                               ('\\' ('"' | '\\' | 'r' | 'n' | 'b' | 't')) | 
+                               ('\\' [0-9] [0-9] [0-9]) |
+                               ('\\' 'x' [0-9a-fA-F] [0-9a-fA-F])
                         )*  '\'';
 
         COMMENT_LINE    -> '--' (.* - (.* NEW_LINE .*)) ;
@@ -92,6 +96,7 @@ grammar Lua
                        BRACKET_EXPR;
 
         UNARY_EXPR -> SIMPLE_EXPR |
+                      '#'^ SIMPLE_EXPR |
                       '-'^ SIMPLE_EXPR |
                       '+'^ SIMPLE_EXPR;
 
@@ -100,7 +105,8 @@ grammar Lua
 
         MUL_EXPR -> POWER_EXPR |
                     MUL_EXPR '*'^ POWER_EXPR |
-                    MUL_EXPR '/'^ POWER_EXPR;
+                    MUL_EXPR '/'^ POWER_EXPR |
+                    MUL_EXPR '%'^ POWER_EXPR;
 
         ADD_EXPR -> MUL_EXPR |
                     ADD_EXPR '..'^ MUL_EXPR |
@@ -127,6 +133,8 @@ grammar Lua
         EXPR -> OR_BOOL_EXPR;
 
         EOS -> ';' *;
+
+        NOP -> ';';
 
         REXPR -> EXPR | ARRAY_DECLARATION | LAMBDA_DECLARATION;
 
@@ -156,9 +164,9 @@ grammar Lua
 
         REPEAT_STMT -> 'repeat'^ { STATEMENTS } {'until'^ EXPR };
 
-        FOR_STMT -> 'for'^ { IDENTIFIER '='! EXPR ','! EXPR (','! EXPR)? } {'do'! STATEMENTS 'end'!};
+        FOR_STMT -> ('for' | 'local')^ { IDENTIFIER '='! EXPR ','! EXPR (','! EXPR)? } {'do'! STATEMENTS 'end'!};
 
-        FOR_IN_STMT -> 'for'^ { IDENTIFIER 'in'! EXPR } {'do'! STATEMENTS 'end'!};
+        FOR_IN_STMT -> 'for'^ { ID_LIST  'in'^ EXPR } {'do'! STATEMENTS 'end'!};
 
         BREAK_STMT -> 'break' EOS!;
 
@@ -172,6 +180,7 @@ grammar Lua
                      FOR_IN_STMT |
                      BREAK_STMT |
                      RETURN_STMT |
+                     NOP |
                      FUNCTION_DECLARATION;
 
         STATEMENTS -> STATEMENT STATEMENT*;
