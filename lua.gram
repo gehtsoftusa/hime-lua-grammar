@@ -170,13 +170,16 @@ grammar Lua
 
         ASSIGN_STMT -> ASSIGN_TARGET_LIST '='! CALL_ARGS EOS!;
 
-        CALL_STMT -> CALL EOS!;
-
         DECLARATION_ITEM_ASSIGNMENT -> ID_LIST '='! CALL_ARGS;
 
         DECLARATION -> 'local'! ID_LIST ('='! CALL_ARGS)?  EOS!;
+ 
+        RETURN_KW -> 'return';
 
-        RETURN_STMT ->  'return'! CALL_ARGS? EOS!;
+        RETURN_STMT ->  RETURN_KW! CALL_ARGS EOS! | 
+                        RETURN_KW! ';';
+
+        CALL_STMT -> CALL EOS!;
 
         ELSEIF_CLAUSE -> 'elseif'! EXPR 'then'! STATEMENTS ;
 
@@ -205,6 +208,7 @@ grammar Lua
 
         STATEMENT -> DECLARATION |
                      ASSIGN_STMT |
+                     RETURN_STMT |
                      CALL_STMT |
                      IF_STMT |
                      WHILE_STMT |
@@ -212,11 +216,10 @@ grammar Lua
                      FOR_STMT |
                      FOR_IN_STMT |
                      BREAK_STMT |
-                     RETURN_STMT |
                      NOP |
                      FUNCTION_DECLARATION;
 
-        STATEMENTS -> STATEMENT STATEMENT*;
+        STATEMENTS -> STATEMENT* RETURN_KW?;
 
         ID_LIST -> IDENTIFIER (','! IDENTIFIER)*;
 
